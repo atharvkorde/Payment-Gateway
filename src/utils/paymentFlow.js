@@ -1,5 +1,6 @@
 import { UPI_APPS, UPI_PACKAGES } from '../constants'
 import { detectDevice } from './device'
+import { openPaytmApp, openPhonePeAppLauncher } from './appLauncher'
 import {
   launchIntent,
   launchFallbackIntent,
@@ -7,37 +8,114 @@ import {
   LAUNCH_STATUS,
 } from './intent'
 import { generateUpiLink } from './upi'
+import { generateQrPaymentPayload } from './qrPayload'
 import { generateQrAssets, downloadQrImage, shareQrWithPaymentLink } from './qr'
 
 export { LAUNCH_STATUS }
 
-/**
- * Paytm — direct UPI Intent launch.
- */
-export async function openPaytm(order, onStatusChange) {
-  return launchIntent(order, UPI_APPS.PAYTM, UPI_PACKAGES[UPI_APPS.PAYTM], onStatusChange)
+export const FLOW_TYPES = {
+  [UPI_APPS.PAYTM]: 'QR',
+  [UPI_APPS.GOOGLE_PAY]: 'Share',
+  [UPI_APPS.PHONEPE]: 'QR Upload',
+  [UPI_APPS.BHIM]: 'UPI Intent',
 }
 
 /**
- * BHIM — direct UPI Intent with QR fallback on failure.
+ * Paytm — TezGateway QR-only flow.
+ * NO UPI Intent. NO upi:// or intent:// navigation.
  */
+export async function openPaytm(order, onStatusChange) {
+  const timestamp = new Date().toISOString()
+  const qrPayload = generateQrPaymentPayload(order)
+
+  const base = {
+    app: UPI_APPS.PAYTM,
+    flow: UPI_APPS.PAYTM,
+    flowType: FLOW_TYPES[UPI_APPS.PAYTM],
+    timestamp,
+    showQr: true,
+    qrOnly: true,
+  }
+
+  onStatusChange?.({
+    ...base,
+    testMode: 'qr_generated',
+    flowStatus: 'qr_generated',
+    intentLaunchStatus: 'paytm_qr_generating',
+  })
+
+  const { dataUrl } = await generateQrAssets(qrPayload)
+  const filename = `paytm-qr-${order.id}.png`
+
+  downloadQrImage(dataUrl, filename)
+
+  onStatusChange?.({
+    ...base,
+    qrDataUrl: dataUrl,
+    testMode: 'qr_downloaded',
+    flowStatus: 'qr_downloaded',
+    intentLaunchStatus: 'paytm_qr_downloaded',
+    flowInstruction: 'QR Downloaded Successfully — Open Paytm and scan or import QR',
+  })
+
+  const appResult = await openPaytmApp()
+
+  onStatusChange?.({
+    ...base,
+    qrDataUrl: dataUrl,
+    testMode: appResult.opened ? 'app_opened' : 'qr_downloaded',
+    flowStatus: appResult.opened ? 'app_opened' : 'qr_downloaded',
+    intentLaunchStatus: appResult.opened ? 'paytm_app_opened' : 'paytm_app_open_failed',
+    flowInstruction: appResult.opened
+      ? 'Paytm opened — Scan QR or import from Gallery'
+      : 'QR saved — Open Paytm manually and scan or import QR',
+    appOpenFailed: !appResult.opened,
+  })
+
+  console.log('[Paytm] QR flow complete — no UPI Intent used')
+
+  return {
+    ...base,
+    status: appResult.opened ? 'app_opened' : 'qr_downloaded',
+    qrDataUrl: dataUrl,
+    appOpenFailed: !appResult.opened,
+  }
+}
+
+export async function retryOpenPaytmApp(onStatusChange) {
+  onStatusChange?.({
+    app: UPI_APPS.PAYTM,
+    flow: UPI_APPS.PAYTM,
+    flowType: FLOW_TYPES[UPI_APPS.PAYTM],
+    testMode: 'attempting',
+    intentLaunchStatus: 'paytm_retry_app_open',
+  })
+
+  const result = await openPaytmApp()
+
+  onStatusChange?.({
+    app: UPI_APPS.PAYTM,
+    flow: UPI_APPS.PAYTM,
+    flowType: FLOW_TYPES[UPI_APPS.PAYTM],
+    testMode: result.opened ? 'app_opened' : 'qr_downloaded',
+    flowStatus: result.opened ? 'app_opened' : 'qr_downloaded',
+    intentLaunchStatus: result.opened ? 'paytm_app_opened' : 'paytm_app_open_failed',
+    appOpenFailed: !result.opened,
+  })
+
+  return result
+}
+
 export async function openBhim(order, onStatusChange) {
   return launchIntent(order, UPI_APPS.BHIM, UPI_PACKAGES[UPI_APPS.BHIM], onStatusChange)
 }
 
-/**
- * Generic UPI chooser.
- */
 export async function openGenericUpi(order, onStatusChange) {
   return launchGenericIntent(order, onStatusChange)
 }
 
 /**
- * Google Pay — TezGateway flow:
- * 1. Generate QR image
- * 2. Show QR on page
- * 3. Open Android share sheet with QR + payment link (user picks GPay)
- * 4. Secondary fallback: UPI Intent
+ * Google Pay — unchanged: QR + share sheet + intent fallback.
  */
 export async function openGooglePay(order, onStatusChange) {
   const upiUrl = generateUpiLink(order)
@@ -49,12 +127,14 @@ export async function openGooglePay(order, onStatusChange) {
     upiUrl,
     timestamp,
     flow: UPI_APPS.GOOGLE_PAY,
+    flowType: FLOW_TYPES[UPI_APPS.GOOGLE_PAY],
     showQr: true,
   }
 
   onStatusChange?.({
     ...base,
-    testMode: LAUNCH_STATUS.ATTEMPTING,
+    testMode: 'qr_generated',
+    flowStatus: 'qr_generated',
     intentLaunchStatus: 'gpay_generating_qr',
   })
 
@@ -64,6 +144,7 @@ export async function openGooglePay(order, onStatusChange) {
     ...base,
     qrDataUrl: dataUrl,
     testMode: 'qr_shown',
+    flowStatus: 'qr_generated',
     intentLaunchStatus: 'gpay_qr_generated',
     flowInstruction: 'Select Google Pay from the share sheet',
   })
@@ -77,22 +158,13 @@ export async function openGooglePay(order, onStatusChange) {
         text: `UPI Payment — ${order.id}`,
       })
 
-      if (shareResult.status === 'shared_with_qr') {
+      if (shareResult.status === 'shared_with_qr' || shareResult.status === 'shared_text_only') {
         onStatusChange?.({
           ...base,
           qrDataUrl: dataUrl,
           testMode: 'qr_shared',
+          flowStatus: 'qr_shared',
           intentLaunchStatus: 'gpay_share_sheet_opened',
-        })
-        return { ...base, status: 'qr_shared', qrDataUrl: dataUrl }
-      }
-
-      if (shareResult.status === 'shared_text_only') {
-        onStatusChange?.({
-          ...base,
-          qrDataUrl: dataUrl,
-          testMode: 'qr_shared',
-          intentLaunchStatus: 'gpay_share_text_only',
         })
         return { ...base, status: 'qr_shared', qrDataUrl: dataUrl }
       }
@@ -111,7 +183,6 @@ export async function openGooglePay(order, onStatusChange) {
     }
   }
 
-  // Secondary fallback: UPI Intent
   console.log('[GPay] Share unavailable — trying UPI Intent fallback')
   onStatusChange?.({
     ...base,
@@ -128,17 +199,16 @@ export async function openGooglePay(order, onStatusChange) {
         ...result,
         qrDataUrl: dataUrl,
         flow: UPI_APPS.GOOGLE_PAY,
+        flowType: FLOW_TYPES[UPI_APPS.GOOGLE_PAY],
         showQr: true,
-        flowInstruction: result.testMode === LAUNCH_STATUS.INTENT_OPENED
-          ? 'Google Pay opened via UPI Intent'
-          : 'Select Google Pay from share sheet or scan QR below',
+        flowInstruction:
+          result.testMode === LAUNCH_STATUS.INTENT_OPENED
+            ? 'Google Pay opened via UPI Intent'
+            : 'Select Google Pay from share sheet or scan QR below',
       })
   )
 }
 
-/**
- * Retry Google Pay share sheet (called from UI button).
- */
 export async function retryGooglePayShare(order, onStatusChange) {
   const upiUrl = generateUpiLink(order)
   const { dataUrl, blob } = await generateQrAssets(upiUrl)
@@ -146,9 +216,10 @@ export async function retryGooglePayShare(order, onStatusChange) {
   onStatusChange?.({
     app: UPI_APPS.GOOGLE_PAY,
     flow: UPI_APPS.GOOGLE_PAY,
+    flowType: FLOW_TYPES[UPI_APPS.GOOGLE_PAY],
     qrDataUrl: dataUrl,
     showQr: true,
-    testMode: LAUNCH_STATUS.ATTEMPTING,
+    testMode: 'attempting',
     intentLaunchStatus: 'gpay_retry_share',
   })
 
@@ -177,32 +248,30 @@ export async function retryGooglePayShare(order, onStatusChange) {
 }
 
 /**
- * PhonePe — TezGateway flow:
- * 1. Generate QR image
- * 2. Auto-download QR to gallery
- * 3. Show QR on page + instruction
- * 4. "Open PhonePe" button triggers UPI Intent (secondary fallback)
+ * PhonePe — QR download + auto-open app (launcher only, NOT UPI Intent).
  */
 export async function openPhonePe(order, onStatusChange) {
-  const upiUrl = generateUpiLink(order)
+  const qrPayload = generateQrPaymentPayload(order)
   const timestamp = new Date().toISOString()
 
   const base = {
     app: UPI_APPS.PHONEPE,
-    upiUrl,
     timestamp,
     flow: UPI_APPS.PHONEPE,
+    flowType: FLOW_TYPES[UPI_APPS.PHONEPE],
     showQr: true,
+    qrOnly: true,
     flowInstruction: 'Open PhonePe and upload QR from Gallery',
   }
 
   onStatusChange?.({
     ...base,
-    testMode: LAUNCH_STATUS.ATTEMPTING,
+    testMode: 'qr_generated',
+    flowStatus: 'qr_generated',
     intentLaunchStatus: 'phonepe_generating_qr',
   })
 
-  const { dataUrl } = await generateQrAssets(upiUrl)
+  const { dataUrl } = await generateQrAssets(qrPayload)
   const filename = `phonepe-qr-${order.id}.png`
 
   downloadQrImage(dataUrl, filename)
@@ -211,54 +280,61 @@ export async function openPhonePe(order, onStatusChange) {
     ...base,
     qrDataUrl: dataUrl,
     testMode: 'qr_downloaded',
+    flowStatus: 'qr_downloaded',
     intentLaunchStatus: 'phonepe_qr_downloaded',
   })
 
-  console.log('[PhonePe] QR downloaded, awaiting user action')
+  const appResult = await openPhonePeAppLauncher()
+
+  onStatusChange?.({
+    ...base,
+    qrDataUrl: dataUrl,
+    testMode: appResult.opened ? 'app_opened' : 'qr_downloaded',
+    flowStatus: appResult.opened ? 'app_opened' : 'qr_downloaded',
+    intentLaunchStatus: appResult.opened ? 'phonepe_app_opened' : 'phonepe_app_open_failed',
+    flowInstruction: appResult.opened
+      ? 'PhonePe opened — Upload QR from Gallery'
+      : 'QR saved to Downloads — Open PhonePe manually and upload QR from Gallery',
+    appOpenFailed: !appResult.opened,
+  })
 
   return {
     ...base,
-    status: 'qr_downloaded',
+    status: appResult.opened ? 'app_opened' : 'qr_downloaded',
     qrDataUrl: dataUrl,
+    appOpenFailed: !appResult.opened,
   }
 }
 
-/**
- * Open PhonePe app via UPI Intent (secondary fallback button).
- */
 export async function openPhonePeApp(order, onStatusChange) {
-  const upiUrl = generateUpiLink(order)
+  onStatusChange?.({
+    app: UPI_APPS.PHONEPE,
+    flow: UPI_APPS.PHONEPE,
+    flowType: FLOW_TYPES[UPI_APPS.PHONEPE],
+    testMode: 'attempting',
+    intentLaunchStatus: 'phonepe_retry_app_open',
+    showQr: true,
+  })
+
+  const result = await openPhonePeAppLauncher()
 
   onStatusChange?.({
     app: UPI_APPS.PHONEPE,
     flow: UPI_APPS.PHONEPE,
-    upiUrl,
-    testMode: LAUNCH_STATUS.ATTEMPTING,
-    intentLaunchStatus: 'phonepe_intent_launch',
+    flowType: FLOW_TYPES[UPI_APPS.PHONEPE],
+    testMode: result.opened ? 'app_opened' : 'qr_downloaded',
+    flowStatus: result.opened ? 'app_opened' : 'qr_downloaded',
+    intentLaunchStatus: result.opened ? 'phonepe_app_opened' : 'phonepe_app_open_failed',
+    flowInstruction: result.opened
+      ? 'PhonePe opened — Upload QR from Gallery'
+      : 'Open PhonePe manually → Scan & Pay → Upload from Gallery',
+    appOpenFailed: !result.opened,
     showQr: true,
-    flowInstruction: 'Open PhonePe and upload QR from Gallery',
   })
 
-  return launchIntent(
-    order,
-    UPI_APPS.PHONEPE,
-    UPI_PACKAGES[UPI_APPS.PHONEPE],
-    (result) =>
-      onStatusChange?.({
-        ...result,
-        flow: UPI_APPS.PHONEPE,
-        showQr: true,
-        flowInstruction:
-          result.testMode === LAUNCH_STATUS.INTENT_OPENED
-            ? 'PhonePe opened — or upload QR from Gallery'
-            : 'Open PhonePe and upload QR from Gallery',
-      })
-  )
+  return result
 }
 
-/**
- * Secondary UPI Intent fallback for any app (explicit user action).
- */
 export async function openAppViaIntent(order, appKey, onStatusChange) {
   const packageName = UPI_PACKAGES[appKey]
   if (!packageName) return launchFallbackIntent(order, appKey, onStatusChange)

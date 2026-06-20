@@ -1,4 +1,5 @@
 import { UpiAppIcon } from './UpiAppIcon'
+import { METHOD_BADGES } from '../constants/payment'
 
 const appConfig = {
   google_pay: {
@@ -33,6 +34,7 @@ const appConfig = {
 
 export default function PaymentButton({ appKey, onClick, loading, index = 0 }) {
   const cfg = appConfig[appKey]
+  const badge = METHOD_BADGES[appKey]
   if (!cfg) return null
 
   return (
@@ -41,9 +43,17 @@ export default function PaymentButton({ appKey, onClick, loading, index = 0 }) {
       onClick={onClick}
       disabled={loading}
       style={{ animationDelay: `${index * 80}ms` }}
-      className={`animate-slide-up group flex flex-col items-center gap-2.5 rounded-2xl border-2 ${cfg.bg} ${cfg.border} p-4 shadow-sm transition-all duration-200 active:scale-95 active:ring-4 ${cfg.ring} hover:shadow-lg disabled:opacity-50 disabled:active:scale-100`}
+      className={`animate-slide-up group relative flex flex-col items-center gap-2 rounded-2xl border-2 ${cfg.bg} ${cfg.border} p-4 shadow-sm transition-all duration-200 active:scale-95 active:ring-4 ${cfg.ring} hover:shadow-lg disabled:opacity-50 disabled:active:scale-100`}
     >
-      <div className={`relative transition-transform duration-200 group-active:scale-110 ${loading ? 'animate-pulse' : ''}`}>
+      {badge && (
+        <span
+          className={`absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${badge.color}`}
+        >
+          {badge.label}
+        </span>
+      )}
+
+      <div className={`relative mt-1 transition-transform duration-200 group-active:scale-110 ${loading ? 'animate-pulse' : ''}`}>
         <UpiAppIcon appKey={appKey} className="h-14 w-14 drop-shadow-sm" />
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/70">

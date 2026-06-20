@@ -73,7 +73,9 @@ export {
   openBhim,
   openGenericUpi,
   retryGooglePayShare,
+  retryOpenPaytmApp,
   openAppViaIntent,
+  FLOW_TYPES,
 } from './paymentFlow'
 
 // QR utilities

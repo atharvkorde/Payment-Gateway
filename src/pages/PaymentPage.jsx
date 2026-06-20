@@ -4,10 +4,10 @@ import AppFlowPanel from '../components/AppFlowPanel'
 import CountdownTimer from '../components/CountdownTimer'
 import DebugPanel from '../components/DebugPanel'
 import DeviceWarning from '../components/DeviceWarning'
+import { TestModeStatus } from '../components/FlowStatusBadges'
 import OrderSummaryCard from '../components/OrderSummaryCard'
 import PayViaQR from '../components/PayViaQR'
 import PaymentButton, { GenericUpiButton } from '../components/PaymentButton'
-import TestModeStatus from '../components/TestModeStatus'
 import { UPI_APPS } from '../constants'
 import { useDebug } from '../hooks/useDebug'
 import { getOrderById } from '../utils/storage'
@@ -34,6 +34,7 @@ export default function PaymentPage() {
   const order = getOrderById(orderId)
   const [loading, setLoading] = useState(null)
   const [testMode, setTestMode] = useState(null)
+  const [flowStatus, setFlowStatus] = useState(null)
   const [showQrFallback, setShowQrFallback] = useState(false)
   const [activeFlow, setActiveFlow] = useState(null)
   const [expired, setExpired] = useState(false)
@@ -42,22 +43,17 @@ export default function PaymentPage() {
     return (
       <div className="py-12 text-center">
         <p className="text-lg font-semibold text-gray-700">Order not found</p>
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="mt-4 font-medium text-brand-600"
-        >
+        <button type="button" onClick={() => navigate('/')} className="mt-4 font-medium text-brand-600">
           ← Back to Home
         </button>
       </div>
     )
   }
 
-  const upiUrl = generateUpiLink(order)
-
   const handleStatusChange = (result) => {
     logLaunch(result)
     if (result.testMode) setTestMode(result.testMode)
+    if (result.flowStatus) setFlowStatus(result.flowStatus)
     if (result.showQr) setShowQrFallback(true)
 
     if (result.flow) {
@@ -65,12 +61,16 @@ export default function PaymentPage() {
         app: result.flow,
         qrDataUrl: result.qrDataUrl || activeFlow?.qrDataUrl,
         instruction: result.flowInstruction || activeFlow?.instruction,
+        flowStatus: result.flowStatus || flowStatus,
+        appOpenFailed: result.appOpenFailed ?? activeFlow?.appOpenFailed,
       })
     } else if (result.qrDataUrl && result.app) {
       setActiveFlow((prev) => ({
         app: result.app,
         qrDataUrl: result.qrDataUrl,
         instruction: prev?.instruction,
+        flowStatus: result.flowStatus || prev?.flowStatus,
+        appOpenFailed: result.appOpenFailed ?? prev?.appOpenFailed,
       }))
     }
   }
@@ -78,9 +78,9 @@ export default function PaymentPage() {
   const handleLaunch = async (appKey, handler) => {
     setLoading(appKey)
     setTestMode('attempting')
+    setFlowStatus(null)
 
-    // Paytm & BHIM use direct intent — clear QR flow panel unless fallback triggers
-    if (appKey === UPI_APPS.PAYTM || appKey === UPI_APPS.BHIM) {
+    if (appKey === UPI_APPS.BHIM) {
       setActiveFlow(null)
       setShowQrFallback(false)
     }
@@ -97,7 +97,6 @@ export default function PaymentPage() {
         app: appKey,
         testMode: 'intent_failed',
         intentLaunchStatus: 'error',
-        upiUrl,
         showQr: true,
         timestamp: new Date().toISOString(),
       })
@@ -106,17 +105,12 @@ export default function PaymentPage() {
     setTimeout(() => setLoading(null), 2500)
   }
 
-  const handlePaid = () => {
-    navigate(`/status/${order.id}`)
-  }
-
   const showQrSection = showQrFallback || activeFlow !== null
 
   return (
     <div className="payment-page -mx-4 min-h-full bg-gradient-to-b from-blue-50 via-white to-gray-50 px-4 pb-6">
       <DeviceWarning />
 
-      {/* Header */}
       <div className="animate-fade-in pt-2 text-center">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-xl font-bold text-white shadow-lg shadow-brand-600/30">
           {order.merchantName.charAt(0).toUpperCase()}
@@ -143,7 +137,6 @@ export default function PaymentPage() {
         <OrderSummaryCard order={order} />
       </div>
 
-      {/* UPI App grid */}
       <div className="mt-6">
         <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
           Pay using UPI App
@@ -167,7 +160,6 @@ export default function PaymentPage() {
         </div>
       </div>
 
-      {/* App-specific flow panel (GPay / PhonePe) */}
       {activeFlow && (
         <div className="mt-5">
           <AppFlowPanel
@@ -175,13 +167,14 @@ export default function PaymentPage() {
             flow={activeFlow.app}
             qrDataUrl={activeFlow.qrDataUrl}
             instruction={activeFlow.instruction}
+            flowStatus={activeFlow.flowStatus || flowStatus}
+            appOpenFailed={activeFlow.appOpenFailed}
             onStatusChange={handleStatusChange}
             onLoading={setLoading}
           />
         </div>
       )}
 
-      {/* Divider + QR fallback section */}
       <div className="my-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-gray-200" />
         <span className="text-xs font-semibold uppercase text-gray-400">
@@ -190,25 +183,19 @@ export default function PaymentPage() {
         <div className="h-px flex-1 bg-gray-200" />
       </div>
 
-      <PayViaQR
-        order={order}
-        forceShow={showQrSection}
-        qrDataUrl={activeFlow?.qrDataUrl}
-      />
+      <PayViaQR order={order} forceShow={showQrSection} qrDataUrl={activeFlow?.qrDataUrl} />
 
       <button
         type="button"
-        onClick={handlePaid}
-        className="animate-slide-up mt-6 w-full rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 py-4 text-base font-bold text-white shadow-lg shadow-green-600/25 transition-all active:scale-[0.98] hover:from-green-700 hover:to-emerald-700"
+        onClick={() => navigate(`/status/${order.id}`)}
+        className="animate-slide-up mt-6 w-full rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 py-4 text-base font-bold text-white shadow-lg shadow-green-600/25 transition-all active:scale-[0.98]"
         style={{ animationDelay: '400ms' }}
       >
         ✓ I Have Paid
       </button>
 
       <p className="mt-3 text-center text-[11px] leading-relaxed text-gray-400">
-        Testing platform only. No auto-verification.
-        <br />
-        Paytm opens directly · GPay shares QR · PhonePe downloads QR
+        Paytm: QR Based · GPay: Share + QR · PhonePe: QR Upload
       </p>
 
       <DebugPanel />

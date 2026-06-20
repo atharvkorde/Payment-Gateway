@@ -5,10 +5,6 @@ export default function DebugPanel({ defaultExpanded = false }) {
   const { debug } = useDebug()
   const [expanded, setExpanded] = useState(defaultExpanded)
 
-  const installedSummary = (debug.installedApps || [])
-    .map((a) => `${a.name}: ${a.installed}`)
-    .join(' | ')
-
   return (
     <div className="mt-6 overflow-hidden rounded-xl border border-gray-700 bg-gray-900 text-gray-100">
       <button
@@ -20,7 +16,7 @@ export default function DebugPanel({ defaultExpanded = false }) {
           🛠 Deep Debug Panel
         </span>
         <span className="rounded bg-gray-800 px-2 py-0.5 text-[10px] text-green-400">
-          {debug.testMode || 'idle'}
+          {debug.flowType || debug.testMode || 'idle'}
         </span>
       </button>
 
@@ -30,6 +26,17 @@ export default function DebugPanel({ defaultExpanded = false }) {
             <Row label="Device" value={debug.deviceType} />
             <Row label="Android" value={debug.androidVersion} />
             <Row label="Browser" value={`${debug.browser} (${debug.browserKey})`} />
+          </Section>
+
+          <Section title="Flow">
+            <Row label="Flow Type" value={debug.flowType || '—'} highlight />
+            <Row label="Flow Status" value={debug.flowStatus || '—'} />
+            <Row label="Last App" value={debug.lastClickedApp} />
+            <Row label="Status" value={debug.intentLaunchStatus} />
+            <Row label="Test Mode" value={debug.testMode || '—'} />
+            {debug.lastLaunchTime && (
+              <Row label="Time" value={new Date(debug.lastLaunchTime).toLocaleTimeString()} />
+            )}
           </Section>
 
           <Section title="App Detection">
@@ -47,36 +54,34 @@ export default function DebugPanel({ defaultExpanded = false }) {
                 }
               />
             ))}
-            {installedSummary && (
-              <p className="break-all text-[10px] text-gray-500">{installedSummary}</p>
-            )}
           </Section>
 
-          <Section title="Launch">
-            <Row label="Last App" value={debug.lastClickedApp} />
-            <Row label="Status" value={debug.intentLaunchStatus} />
-            <Row label="Test Mode" value={debug.testMode || '—'} highlight />
-            {debug.lastLaunchTime && (
-              <Row label="Time" value={new Date(debug.lastLaunchTime).toLocaleTimeString()} />
-            )}
-          </Section>
+          {debug.flowType !== 'QR' && debug.flowType !== 'QR Upload' && (
+            <Section title="URLs">
+              <div>
+                <p className="text-gray-500">UPI Link:</p>
+                <p className="mt-0.5 break-all text-green-400">{debug.generatedUpiUrl || '—'}</p>
+              </div>
+              <div className="mt-2">
+                <p className="text-gray-500">Intent URL:</p>
+                <p className="mt-0.5 break-all text-blue-400">{debug.intentUrl || '—'}</p>
+              </div>
+            </Section>
+          )}
 
-          <Section title="URLs">
-            <div>
-              <p className="text-gray-500">UPI Link:</p>
-              <p className="mt-0.5 break-all text-green-400">{debug.generatedUpiUrl || '—'}</p>
-            </div>
-            <div className="mt-2">
-              <p className="text-gray-500">Intent URL:</p>
-              <p className="mt-0.5 break-all text-blue-400">{debug.intentUrl || '—'}</p>
-            </div>
-          </Section>
+          {(debug.flowType === 'QR' || debug.flowType === 'QR Upload') && (
+            <Section title="QR Flow">
+              <p className="text-[10px] text-gray-500">
+                QR-only flow — no UPI Intent or deep link navigation used.
+              </p>
+            </Section>
+          )}
 
           {(debug.launchHistory || []).length > 0 && (
             <Section title="History">
               {debug.launchHistory.map((h, i) => (
                 <p key={i} className="text-[10px] text-gray-400">
-                  [{new Date(h.timestamp).toLocaleTimeString()}] {h.app} → {h.status}
+                  [{new Date(h.timestamp).toLocaleTimeString()}] {h.app} ({h.flowType}) → {h.status}
                 </p>
               ))}
             </Section>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { detectDevice, getDeviceLabel } from '../utils/device'
 import { detectInstalledApps } from '../utils/intent'
+import { FLOW_TYPES } from '../utils/paymentFlow'
 import { saveDebugState, getDebugState } from '../utils/storage'
 
 const DebugContext = createContext(null)
@@ -20,6 +21,8 @@ export function DebugProvider({ children }) {
     lastClickedApp: saved?.lastClickedApp || 'None',
     intentLaunchStatus: saved?.intentLaunchStatus || 'None',
     testMode: saved?.testMode || null,
+    flowType: saved?.flowType || 'None',
+    flowStatus: saved?.flowStatus || null,
     lastLaunchTime: saved?.lastLaunchTime || null,
     installedApps,
     launchHistory: saved?.launchHistory || [],
@@ -39,8 +42,8 @@ export function DebugProvider({ children }) {
       const entry = {
         app: result.app || result.lastClickedApp,
         status: result.testMode || result.intentLaunchStatus,
+        flowType: result.flowType || FLOW_TYPES[result.app] || prev.flowType,
         timestamp: result.timestamp || new Date().toISOString(),
-        intentUrl: result.intentUrl,
       }
       const launchHistory = [entry, ...(prev.launchHistory || [])].slice(0, 10)
 
@@ -51,6 +54,8 @@ export function DebugProvider({ children }) {
         lastClickedApp: result.app || result.lastClickedApp || prev.lastClickedApp,
         intentLaunchStatus: result.intentLaunchStatus || result.testMode || prev.intentLaunchStatus,
         testMode: result.testMode || prev.testMode,
+        flowType: result.flowType || FLOW_TYPES[result.app] || prev.flowType,
+        flowStatus: result.flowStatus || prev.flowStatus,
         lastLaunchTime: result.timestamp || new Date().toISOString(),
         launchHistory,
         installedApps: detectInstalledApps(),
