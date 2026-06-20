@@ -4,6 +4,7 @@ import { UpiAppIcon } from './UpiAppIcon'
 import FlowStatusBadges from './FlowStatusBadges'
 import {
   retryGooglePayShare,
+  retryPaytmShare,
   openPhonePeApp,
   retryOpenPaytmApp,
   openAppViaIntent,
@@ -16,6 +17,7 @@ export default function AppFlowPanel({
   instruction,
   flowStatus,
   appOpenFailed,
+  shareFailed,
   onStatusChange,
   onLoading,
 }) {
@@ -24,10 +26,19 @@ export default function AppFlowPanel({
   const cfg = FLOW_CONFIG[flow]
   if (!cfg) return null
 
-  const handleRetryShare = async () => {
+  const handleRetryGPayShare = async () => {
     onLoading?.(flow)
     try {
       await retryGooglePayShare(order, onStatusChange)
+    } finally {
+      onLoading?.(null)
+    }
+  }
+
+  const handleRetryPaytmShare = async () => {
+    onLoading?.(flow)
+    try {
+      await retryPaytmShare(order, onStatusChange)
     } finally {
       onLoading?.(null)
     }
@@ -81,46 +92,41 @@ export default function AppFlowPanel({
         {qrDataUrl && (
           <div className="mt-4 flex justify-center">
             <div className="rounded-xl border-2 border-white bg-white p-3 shadow-md">
-              <img
-                src={qrDataUrl}
-                alt="Payment QR Code"
-                className="h-44 w-44 object-contain"
-              />
+              <img src={qrDataUrl} alt="Payment QR Code" className="h-44 w-44 object-contain" />
             </div>
           </div>
         )}
 
-        {/* Paytm — QR only, no UPI Intent */}
+        {/* Paytm — Share flow (mirrors Google Pay) */}
         {flow === UPI_APPS.PAYTM && (
           <div className="mt-4 space-y-3">
             <div className="rounded-xl bg-white/80 px-4 py-3">
-              <p className="text-sm font-semibold text-paytm">✓ QR Downloaded Successfully</p>
-              <ol className="mt-2 space-y-1.5 text-xs leading-relaxed text-gray-600">
-                <li>1. Paytm opened (or tap Open Paytm below)</li>
-                <li>2. Scan QR shown above</li>
-                <li>3. Import QR from Gallery if scan unavailable</li>
-                <li>4. Complete payment</li>
-              </ol>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleOpenPaytm}
-                className={`rounded-xl ${cfg.accent} py-3 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] hover:opacity-90`}
-              >
-                Open Paytm
-              </button>
-              <div className="flex items-center justify-center rounded-xl border border-paytm/30 bg-white/60 px-3 py-2 text-center text-[10px] font-semibold text-paytm">
-                Scan / Import QR
-              </div>
-            </div>
-
-            {appOpenFailed && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                Could not auto-open Paytm. Tap &quot;Open Paytm&quot; or open manually from your app drawer.
+              <p className="text-sm font-semibold text-paytm">Share with Paytm</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                Share QR image + payment link via Android share sheet. Select Paytm from targets.
               </p>
-            )}
+              {shareFailed && (
+                <p className="mt-2 text-xs font-medium text-amber-700">
+                  Share failed — QR downloaded as fallback. Scan above or open Paytm.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRetryPaytmShare}
+              className={`w-full rounded-xl ${cfg.accent} py-3.5 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] hover:opacity-90`}
+            >
+              Share QR → Select Paytm
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenPaytm}
+              className="w-full rounded-xl border-2 border-paytm bg-white py-3 text-sm font-bold text-paytm transition-all active:scale-[0.98] hover:bg-sky-50"
+            >
+              Open Paytm
+            </button>
           </div>
         )}
 
@@ -153,7 +159,7 @@ export default function AppFlowPanel({
           </div>
         )}
 
-        {/* Google Pay — share + QR, intent fallback only for GPay */}
+        {/* Google Pay — unchanged */}
         {flow === UPI_APPS.GOOGLE_PAY && (
           <div className="mt-4 space-y-3">
             <div className="rounded-xl bg-white/80 px-4 py-3">
@@ -165,7 +171,7 @@ export default function AppFlowPanel({
 
             <button
               type="button"
-              onClick={handleRetryShare}
+              onClick={handleRetryGPayShare}
               className={`w-full rounded-xl ${cfg.accent} py-3.5 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] hover:opacity-90`}
             >
               Share QR → Select GPay

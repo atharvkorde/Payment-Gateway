@@ -14,81 +14,210 @@ import { generateQrAssets, downloadQrImage, shareQrWithPaymentLink } from './qr'
 export { LAUNCH_STATUS }
 
 export const FLOW_TYPES = {
-  [UPI_APPS.PAYTM]: 'QR',
+  [UPI_APPS.PAYTM]: 'Share',
   [UPI_APPS.GOOGLE_PAY]: 'Share',
   [UPI_APPS.PHONEPE]: 'QR Upload',
   [UPI_APPS.BHIM]: 'UPI Intent',
 }
 
+function buildShareDetails(order) {
+  const paymentLink = generateUpiLink(order)
+  return {
+    paymentLink,
+    title: `Pay ₹${order.amount} to ${order.merchantName}`,
+    text: [
+      `Payment to ${order.merchantName}`,
+      `Amount: ₹${order.amount}`,
+      `Order: ${order.id}`,
+      `UPI ID: ${order.upiId}`,
+      `Link: ${paymentLink}`,
+    ].join('\n'),
+  }
+}
+
 /**
- * Paytm — TezGateway QR-only flow.
- * NO UPI Intent. NO upi:// or intent:// navigation.
+ * Paytm fallback when share fails — download QR, show on screen, no UPI Intent.
+ */
+async function paytmShareFallback(order, dataUrl, base, onStatusChange) {
+  const filename = `paytm-qr-${order.id}.png`
+  downloadQrImage(dataUrl, filename)
+
+  console.log('[Paytm] Share failed — fallback: download QR + show on screen')
+
+  onStatusChange?.({
+    ...base,
+    qrDataUrl: dataUrl,
+    testMode: 'fallback_used',
+    flowStatus: 'qr_downloaded',
+    intentLaunchStatus: 'paytm_share_fallback',
+    flowInstruction: 'Share failed — QR downloaded. Open Paytm and scan or import QR.',
+    showQr: true,
+    shareFailed: true,
+  })
+
+  return { ...base, status: 'fallback_used', qrDataUrl: dataUrl, shareFailed: true }
+}
+
+/**
+ * Paytm — Share flow (same architecture as Google Pay).
+ * QR PNG + payment link + Android share sheet. NO UPI Intent.
  */
 export async function openPaytm(order, onStatusChange) {
   const timestamp = new Date().toISOString()
-  const qrPayload = generateQrPaymentPayload(order)
+  const device = detectDevice()
+  const { paymentLink, title, text } = buildShareDetails(order)
 
   const base = {
     app: UPI_APPS.PAYTM,
     flow: UPI_APPS.PAYTM,
     flowType: FLOW_TYPES[UPI_APPS.PAYTM],
+    paymentLink,
     timestamp,
     showQr: true,
-    qrOnly: true,
   }
 
   onStatusChange?.({
     ...base,
-    testMode: 'qr_generated',
+    testMode: 'paytm_share_started',
     flowStatus: 'qr_generated',
-    intentLaunchStatus: 'paytm_qr_generating',
+    intentLaunchStatus: 'paytm_share_started',
+    flowInstruction: 'Select Paytm from the share sheet',
   })
 
-  const { dataUrl } = await generateQrAssets(qrPayload)
-  const filename = `paytm-qr-${order.id}.png`
-
-  downloadQrImage(dataUrl, filename)
+  const { dataUrl, blob } = await generateQrAssets(paymentLink)
 
   onStatusChange?.({
     ...base,
     qrDataUrl: dataUrl,
-    testMode: 'qr_downloaded',
-    flowStatus: 'qr_downloaded',
-    intentLaunchStatus: 'paytm_qr_downloaded',
-    flowInstruction: 'QR Downloaded Successfully — Open Paytm and scan or import QR',
+    testMode: 'paytm_share_started',
+    flowStatus: 'qr_generated',
+    intentLaunchStatus: 'paytm_qr_generated',
   })
 
-  const appResult = await openPaytmApp()
+  if (device.isAndroid && navigator.share) {
+    try {
+      const shareResult = await shareQrWithPaymentLink({
+        blob,
+        upiUrl: paymentLink,
+        title,
+        text,
+      })
 
-  onStatusChange?.({
-    ...base,
-    qrDataUrl: dataUrl,
-    testMode: appResult.opened ? 'app_opened' : 'qr_downloaded',
-    flowStatus: appResult.opened ? 'app_opened' : 'qr_downloaded',
-    intentLaunchStatus: appResult.opened ? 'paytm_app_opened' : 'paytm_app_open_failed',
-    flowInstruction: appResult.opened
-      ? 'Paytm opened — Scan QR or import from Gallery'
-      : 'QR saved — Open Paytm manually and scan or import QR',
-    appOpenFailed: !appResult.opened,
-  })
+      if (shareResult.status === 'shared_with_qr' || shareResult.status === 'shared_text_only') {
+        onStatusChange?.({
+          ...base,
+          qrDataUrl: dataUrl,
+          testMode: 'paytm_share_success',
+          flowStatus: 'qr_shared',
+          intentLaunchStatus: 'paytm_share_success',
+          flowInstruction: 'Share Sheet Opened — Select Paytm to complete payment',
+        })
+        console.log('[Paytm] Share success:', shareResult.status)
+        return { ...base, status: 'paytm_share_success', qrDataUrl: dataUrl }
+      }
 
-  console.log('[Paytm] QR flow complete — no UPI Intent used')
+      if (shareResult.status === 'cancelled') {
+        onStatusChange?.({
+          ...base,
+          qrDataUrl: dataUrl,
+          testMode: 'qr_shown',
+          intentLaunchStatus: 'paytm_share_cancelled',
+          flowInstruction: 'Share cancelled — scan QR below or retry share',
+        })
+        return { ...base, status: 'cancelled', qrDataUrl: dataUrl }
+      }
 
-  return {
-    ...base,
-    status: appResult.opened ? 'app_opened' : 'qr_downloaded',
-    qrDataUrl: dataUrl,
-    appOpenFailed: !appResult.opened,
+      if (shareResult.status === 'share_not_supported') {
+        console.log('[Paytm] Share not supported — using fallback')
+        return paytmShareFallback(order, dataUrl, base, onStatusChange)
+      }
+    } catch (err) {
+      console.warn('[Paytm] Share failed:', err)
+      onStatusChange?.({
+        ...base,
+        qrDataUrl: dataUrl,
+        testMode: 'paytm_share_failed',
+        intentLaunchStatus: 'paytm_share_failed',
+      })
+      return paytmShareFallback(order, dataUrl, base, onStatusChange)
+    }
   }
+
+  console.log('[Paytm] Share unavailable — using fallback')
+  onStatusChange?.({
+    ...base,
+    qrDataUrl: dataUrl,
+    testMode: 'paytm_share_failed',
+    intentLaunchStatus: 'paytm_share_not_available',
+  })
+  return paytmShareFallback(order, dataUrl, base, onStatusChange)
 }
 
+/**
+ * Retry Paytm share sheet.
+ */
+export async function retryPaytmShare(order, onStatusChange) {
+  const { paymentLink, title, text } = buildShareDetails(order)
+  const { dataUrl, blob } = await generateQrAssets(paymentLink)
+
+  onStatusChange?.({
+    app: UPI_APPS.PAYTM,
+    flow: UPI_APPS.PAYTM,
+    flowType: FLOW_TYPES[UPI_APPS.PAYTM],
+    qrDataUrl: dataUrl,
+    paymentLink,
+    showQr: true,
+    testMode: 'paytm_share_started',
+    intentLaunchStatus: 'paytm_retry_share',
+    flowInstruction: 'Select Paytm from the share sheet',
+  })
+
+  try {
+    const shareResult = await shareQrWithPaymentLink({ blob, upiUrl: paymentLink, title, text })
+
+    if (shareResult.status === 'cancelled') {
+      onStatusChange?.({
+        testMode: 'qr_shown',
+        intentLaunchStatus: 'paytm_share_cancelled',
+        qrDataUrl: dataUrl,
+        showQr: true,
+      })
+      return { status: 'cancelled' }
+    }
+
+    if (shareResult.status === 'shared_with_qr' || shareResult.status === 'shared_text_only') {
+      onStatusChange?.({
+        testMode: 'paytm_share_success',
+        flowStatus: 'qr_shared',
+        intentLaunchStatus: 'paytm_share_success',
+        qrDataUrl: dataUrl,
+        showQr: true,
+      })
+      return { status: 'paytm_share_success' }
+    }
+  } catch (err) {
+    console.warn('[Paytm] Retry share failed:', err)
+    onStatusChange?.({ testMode: 'paytm_share_failed', intentLaunchStatus: 'paytm_share_failed' })
+  }
+
+  return paytmShareFallback(
+    order,
+    dataUrl,
+    { app: UPI_APPS.PAYTM, flow: UPI_APPS.PAYTM, flowType: FLOW_TYPES[UPI_APPS.PAYTM], paymentLink },
+    onStatusChange
+  )
+}
+
+/**
+ * Open Paytm app (launcher only) — used in share fallback panel.
+ */
 export async function retryOpenPaytmApp(onStatusChange) {
   onStatusChange?.({
     app: UPI_APPS.PAYTM,
     flow: UPI_APPS.PAYTM,
     flowType: FLOW_TYPES[UPI_APPS.PAYTM],
     testMode: 'attempting',
-    intentLaunchStatus: 'paytm_retry_app_open',
+    intentLaunchStatus: 'paytm_open_app',
   })
 
   const result = await openPaytmApp()
@@ -97,7 +226,7 @@ export async function retryOpenPaytmApp(onStatusChange) {
     app: UPI_APPS.PAYTM,
     flow: UPI_APPS.PAYTM,
     flowType: FLOW_TYPES[UPI_APPS.PAYTM],
-    testMode: result.opened ? 'app_opened' : 'qr_downloaded',
+    testMode: result.opened ? 'app_opened' : 'fallback_used',
     flowStatus: result.opened ? 'app_opened' : 'qr_downloaded',
     intentLaunchStatus: result.opened ? 'paytm_app_opened' : 'paytm_app_open_failed',
     appOpenFailed: !result.opened,

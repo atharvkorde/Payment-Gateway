@@ -11,7 +11,10 @@ export default function FlowStatusBadges({ flowStatus, testMode }) {
   ]
 
   const currentIdx = FLOW_STATUS_STEPS.indexOf(current)
-  const isShared = current === 'qr_shared'
+    const isShared =
+      current === 'qr_shared' ||
+      current === 'paytm_share_success' ||
+      current === 'paytm_share_started'
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">

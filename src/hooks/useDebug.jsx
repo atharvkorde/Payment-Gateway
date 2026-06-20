@@ -49,7 +49,7 @@ export function DebugProvider({ children }) {
 
       const next = {
         ...prev,
-        generatedUpiUrl: result.upiUrl || result.generatedUpiUrl || prev.generatedUpiUrl,
+        generatedUpiUrl: result.paymentLink || result.upiUrl || result.generatedUpiUrl || prev.generatedUpiUrl,
         intentUrl: result.intentUrl || prev.intentUrl,
         lastClickedApp: result.app || result.lastClickedApp || prev.lastClickedApp,
         intentLaunchStatus: result.intentLaunchStatus || result.testMode || prev.intentLaunchStatus,
