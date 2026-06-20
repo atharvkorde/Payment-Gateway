@@ -318,23 +318,3 @@ export async function launchGenericIntent(order, onStatusChange) {
 
   return launchFallbackIntent(order, UPI_APPS.GENERIC, onStatusChange)
 }
-
-export function openGooglePay(order, onStatusChange) {
-  return launchIntent(order, UPI_APPS.GOOGLE_PAY, UPI_PACKAGES[UPI_APPS.GOOGLE_PAY], onStatusChange)
-}
-
-export function openPhonePe(order, onStatusChange) {
-  return launchIntent(order, UPI_APPS.PHONEPE, UPI_PACKAGES[UPI_APPS.PHONEPE], onStatusChange)
-}
-
-export function openPaytm(order, onStatusChange) {
-  return launchIntent(order, UPI_APPS.PAYTM, UPI_PACKAGES[UPI_APPS.PAYTM], onStatusChange)
-}
-
-export function openBhim(order, onStatusChange) {
-  return launchIntent(order, UPI_APPS.BHIM, UPI_PACKAGES[UPI_APPS.BHIM], onStatusChange)
-}
-
-export function openGenericUpi(order, onStatusChange) {
-  return launchGenericIntent(order, onStatusChange)
-}

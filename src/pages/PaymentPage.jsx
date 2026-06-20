@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import AppFlowPanel from '../components/AppFlowPanel'
 import CountdownTimer from '../components/CountdownTimer'
 import DebugPanel from '../components/DebugPanel'
 import DeviceWarning from '../components/DeviceWarning'
@@ -7,6 +8,7 @@ import OrderSummaryCard from '../components/OrderSummaryCard'
 import PayViaQR from '../components/PayViaQR'
 import PaymentButton, { GenericUpiButton } from '../components/PaymentButton'
 import TestModeStatus from '../components/TestModeStatus'
+import { UPI_APPS } from '../constants'
 import { useDebug } from '../hooks/useDebug'
 import { getOrderById } from '../utils/storage'
 import {
@@ -19,10 +21,10 @@ import {
 } from '../utils/upi'
 
 const PAYMENT_APPS = [
-  { key: 'google_pay', handler: openGooglePay, label: 'Google Pay' },
-  { key: 'phonepe', handler: openPhonePe, label: 'PhonePe' },
-  { key: 'paytm', handler: openPaytm, label: 'Paytm' },
-  { key: 'bhim', handler: openBhim, label: 'BHIM' },
+  { key: UPI_APPS.GOOGLE_PAY, handler: openGooglePay },
+  { key: UPI_APPS.PHONEPE, handler: openPhonePe },
+  { key: UPI_APPS.PAYTM, handler: openPaytm },
+  { key: UPI_APPS.BHIM, handler: openBhim },
 ]
 
 export default function PaymentPage() {
@@ -33,6 +35,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(null)
   const [testMode, setTestMode] = useState(null)
   const [showQrFallback, setShowQrFallback] = useState(false)
+  const [activeFlow, setActiveFlow] = useState(null)
   const [expired, setExpired] = useState(false)
 
   if (!order) {
@@ -56,12 +59,32 @@ export default function PaymentPage() {
     logLaunch(result)
     if (result.testMode) setTestMode(result.testMode)
     if (result.showQr) setShowQrFallback(true)
+
+    if (result.flow) {
+      setActiveFlow({
+        app: result.flow,
+        qrDataUrl: result.qrDataUrl || activeFlow?.qrDataUrl,
+        instruction: result.flowInstruction || activeFlow?.instruction,
+      })
+    } else if (result.qrDataUrl && result.app) {
+      setActiveFlow((prev) => ({
+        app: result.app,
+        qrDataUrl: result.qrDataUrl,
+        instruction: prev?.instruction,
+      }))
+    }
   }
 
   const handleLaunch = async (appKey, handler) => {
     setLoading(appKey)
     setTestMode('attempting')
-    setShowQrFallback(false)
+
+    // Paytm & BHIM use direct intent — clear QR flow panel unless fallback triggers
+    if (appKey === UPI_APPS.PAYTM || appKey === UPI_APPS.BHIM) {
+      setActiveFlow(null)
+      setShowQrFallback(false)
+    }
+
     console.log(`[Payment] User tapped: ${appKey}`)
 
     try {
@@ -75,6 +98,7 @@ export default function PaymentPage() {
         testMode: 'intent_failed',
         intentLaunchStatus: 'error',
         upiUrl,
+        showQr: true,
         timestamp: new Date().toISOString(),
       })
     }
@@ -86,19 +110,19 @@ export default function PaymentPage() {
     navigate(`/status/${order.id}`)
   }
 
+  const showQrSection = showQrFallback || activeFlow !== null
+
   return (
     <div className="payment-page -mx-4 min-h-full bg-gradient-to-b from-blue-50 via-white to-gray-50 px-4 pb-6">
       <DeviceWarning />
 
-      {/* Header — TezGateway style */}
+      {/* Header */}
       <div className="animate-fade-in pt-2 text-center">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-xl font-bold text-white shadow-lg shadow-brand-600/30">
           {order.merchantName.charAt(0).toUpperCase()}
         </div>
         <p className="text-sm font-medium text-gray-500">{order.merchantName}</p>
-        <p className="mt-1 text-4xl font-bold tracking-tight text-gray-900">
-          ₹{order.amount}
-        </p>
+        <p className="mt-1 text-4xl font-bold tracking-tight text-gray-900">₹{order.amount}</p>
         <div className="mt-3 flex justify-center">
           <CountdownTimer createdAt={order.createdAt} onExpire={() => setExpired(true)} />
         </div>
@@ -109,19 +133,17 @@ export default function PaymentPage() {
         )}
       </div>
 
-      {/* Test mode banner */}
       {testMode && (
         <div className="mt-4">
           <TestModeStatus testMode={testMode} />
         </div>
       )}
 
-      {/* Order summary card */}
       <div className="mt-5">
         <OrderSummaryCard order={order} />
       </div>
 
-      {/* UPI App grid — TezGateway large buttons */}
+      {/* UPI App grid */}
       <div className="mt-6">
         <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
           Pay using UPI App
@@ -145,17 +167,35 @@ export default function PaymentPage() {
         </div>
       </div>
 
-      {/* Divider */}
+      {/* App-specific flow panel (GPay / PhonePe) */}
+      {activeFlow && (
+        <div className="mt-5">
+          <AppFlowPanel
+            order={order}
+            flow={activeFlow.app}
+            qrDataUrl={activeFlow.qrDataUrl}
+            instruction={activeFlow.instruction}
+            onStatusChange={handleStatusChange}
+            onLoading={setLoading}
+          />
+        </div>
+      )}
+
+      {/* Divider + QR fallback section */}
       <div className="my-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs font-semibold uppercase text-gray-400">or</span>
+        <span className="text-xs font-semibold uppercase text-gray-400">
+          {showQrSection ? 'scan qr' : 'or'}
+        </span>
         <div className="h-px flex-1 bg-gray-200" />
       </div>
 
-      {/* Pay via QR */}
-      <PayViaQR order={order} forceShow={showQrFallback} />
+      <PayViaQR
+        order={order}
+        forceShow={showQrSection}
+        qrDataUrl={activeFlow?.qrDataUrl}
+      />
 
-      {/* I Have Paid */}
       <button
         type="button"
         onClick={handlePaid}
@@ -168,7 +208,7 @@ export default function PaymentPage() {
       <p className="mt-3 text-center text-[11px] leading-relaxed text-gray-400">
         Testing platform only. No auto-verification.
         <br />
-        Tap a UPI app above, complete payment, then confirm manually.
+        Paytm opens directly · GPay shares QR · PhonePe downloads QR
       </p>
 
       <DebugPanel />

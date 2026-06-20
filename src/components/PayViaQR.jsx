@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { generateUpiLink, copyToClipboard } from '../utils/upi'
 
-export default function PayViaQR({ order, forceShow = false }) {
+export default function PayViaQR({ order, forceShow = false, qrDataUrl = null }) {
   const [expanded, setExpanded] = useState(forceShow)
   const [toast, setToast] = useState('')
 
@@ -38,7 +38,7 @@ export default function PayViaQR({ order, forceShow = false }) {
           </div>
           <div>
             <p className="font-semibold text-gray-900">Pay via QR</p>
-            <p className="text-xs text-gray-500">Scan with any UPI app</p>
+            <p className="text-xs text-gray-500">Scan with any UPI app — fallback</p>
           </div>
         </div>
         <span className={`text-gray-400 transition-transform ${show ? 'rotate-180' : ''}`}>▼</span>
@@ -48,7 +48,15 @@ export default function PayViaQR({ order, forceShow = false }) {
         <div className="animate-fade-in border-t border-gray-100 px-5 pb-5 pt-4">
           <div className="flex justify-center">
             <div className="rounded-xl border-2 border-gray-100 bg-white p-3 shadow-inner">
-              <QRCodeSVG value={upiUrl} size={180} level="M" bgColor="#ffffff" fgColor="#1e293b" />
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="UPI QR Code"
+                  className="h-[180px] w-[180px] object-contain"
+                />
+              ) : (
+                <QRCodeSVG value={upiUrl} size={180} level="M" bgColor="#ffffff" fgColor="#1e293b" />
+              )}
             </div>
           </div>
           <p className="mt-3 text-center font-mono text-[10px] text-gray-400 break-all">{order.upiId}</p>

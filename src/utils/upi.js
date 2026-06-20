@@ -55,16 +55,32 @@ export async function shareContent({ title, text, url }) {
   return { status: 'copied_fallback' }
 }
 
-// Re-export intent launchers
+// Intent utilities
 export {
   detectInstalledApps,
   launchIntent,
   launchFallbackIntent,
   launchGenericIntent,
+  LAUNCH_STATUS,
+} from './intent'
+
+// App-specific payment flows
+export {
   openGooglePay,
   openPhonePe,
+  openPhonePeApp,
   openPaytm,
   openBhim,
   openGenericUpi,
-  LAUNCH_STATUS,
-} from './intent'
+  retryGooglePayShare,
+  openAppViaIntent,
+} from './paymentFlow'
+
+// QR utilities
+export {
+  generateQrDataUrl,
+  generateQrBlob,
+  generateQrAssets,
+  downloadQrImage,
+  shareQrWithPaymentLink,
+} from './qr'
