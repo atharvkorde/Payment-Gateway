@@ -61,6 +61,21 @@ export default function DebugPanel({ defaultExpanded = false }) {
               <p className="text-[10px] text-gray-500">
                 QR download + app launcher only. No share sheet, no payment deep links.
               </p>
+              {debug.launcherUrl && (
+                <div className="mt-2">
+                  <p className="text-gray-500">Launcher Intent:</p>
+                  <p className="mt-0.5 break-all text-sky-400">{debug.launcherUrl}</p>
+                </div>
+              )}
+            </Section>
+          )}
+
+          {debug.flowType === 'Share' && debug.intentUrl && (
+            <Section title="URLs">
+              <div>
+                <p className="text-gray-500">Intent / Share URL:</p>
+                <p className="mt-0.5 break-all text-blue-400">{debug.intentUrl}</p>
+              </div>
             </Section>
           )}
 
@@ -69,6 +84,12 @@ export default function DebugPanel({ defaultExpanded = false }) {
               {debug.launchHistory.map((h, i) => (
                 <p key={i} className="text-[10px] text-gray-400">
                   [{new Date(h.timestamp).toLocaleTimeString()}] {h.app} ({h.flowType}) → {h.status}
+                  {h.launcherUrl && (
+                    <>
+                      <br />
+                      <span className="break-all text-sky-500/80">{h.launcherUrl}</span>
+                    </>
+                  )}
                 </p>
               ))}
             </Section>

@@ -63,7 +63,6 @@ export default function PaymentPage() {
         instruction: result.flowInstruction || activeFlow?.instruction,
         flowStatus: result.flowStatus || flowStatus,
         appOpenFailed: result.appOpenFailed ?? activeFlow?.appOpenFailed,
-        appNotInstalled: result.appNotInstalled ?? activeFlow?.appNotInstalled,
       })
     } else if (result.qrDataUrl && result.app) {
       setActiveFlow((prev) => ({
@@ -170,7 +169,6 @@ export default function PaymentPage() {
             instruction={activeFlow.instruction}
             flowStatus={activeFlow.flowStatus || flowStatus}
             appOpenFailed={activeFlow.appOpenFailed}
-            appNotInstalled={activeFlow.appNotInstalled}
             onStatusChange={handleStatusChange}
             onLoading={setLoading}
           />

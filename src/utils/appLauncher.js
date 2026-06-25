@@ -1,15 +1,20 @@
 import { UPI_APPS, UPI_PACKAGES } from '../constants'
-import { detectDevice, getBrowserLaunchStrategy } from './device'
+import { detectDevice } from './device'
 
-const APP_LAUNCH_URLS = {
-  [UPI_APPS.PAYTM]: [
-    `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${UPI_PACKAGES[UPI_APPS.PAYTM]};end`,
-  ],
-  [UPI_APPS.PHONEPE]: [
-    `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${UPI_PACKAGES[UPI_APPS.PHONEPE]};end`,
-    `intent://phonepe#Intent;scheme=phonepe;package=${UPI_PACKAGES[UPI_APPS.PHONEPE]};end`,
-    'phonepe://',
-  ],
+/**
+ * Build Android launcher intent — opens app home screen by package.
+ * No S.browser_fallback_url — will NOT redirect to Play Store on failure.
+ *
+ * Format verified for Chrome Android:
+ * intent://#Intent;package=...;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end
+ */
+export function buildLauncherIntent(packageName) {
+  return `intent://#Intent;package=${packageName};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end`
+}
+
+const APP_PACKAGES = {
+  [UPI_APPS.PAYTM]: UPI_PACKAGES[UPI_APPS.PAYTM],
+  [UPI_APPS.PHONEPE]: UPI_PACKAGES[UPI_APPS.PHONEPE],
 }
 
 function watchForAppOpen(timeoutMs = 2500) {
@@ -52,60 +57,59 @@ function watchForAppOpen(timeoutMs = 2500) {
   })
 }
 
-function tryLaunchUrl(url) {
-  const strategy = getBrowserLaunchStrategy()
-  try {
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.style.display = 'none'
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
-  } catch {
-    strategy.launch(url)
-  }
+/**
+ * Launch a single intent URL via anchor click (preserves user gesture).
+ * Does NOT use window.location to avoid unintended navigation.
+ */
+function launchIntentUrl(launcherUrl) {
+  console.log('[AppLauncher] Intent URL:', launcherUrl)
+
+  const anchor = document.createElement('a')
+  anchor.href = launcherUrl
+  anchor.style.display = 'none'
+  anchor.setAttribute('rel', 'noopener')
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
 }
 
 /**
- * Open a UPI app directly (launcher only — NOT a payment/UPI Intent).
+ * Open a UPI app via launcher intent only.
+ * Single attempt — no scheme fallbacks, no Play Store redirect.
  */
 export async function openAppOnly(appKey) {
   const device = detectDevice()
-  const urls = APP_LAUNCH_URLS[appKey]
+  const packageName = APP_PACKAGES[appKey]
 
-  if (!urls) {
+  if (!packageName) {
     console.warn('[AppLauncher] Unknown app:', appKey)
-    return { opened: false, status: 'unknown_app' }
+    return { opened: false, status: 'unknown_app', launcherUrl: null }
   }
+
+  const launcherUrl = buildLauncherIntent(packageName)
 
   if (!device.isAndroid) {
     console.log('[AppLauncher] Not Android — cannot open app')
-    return { opened: false, status: 'not_android' }
+    return { opened: false, status: 'not_android', launcherUrl, app: appKey }
   }
 
-  console.log('[AppLauncher] Opening app (launcher only):', appKey)
+  console.log('[AppLauncher] Opening app (launcher only, no Play Store fallback):', appKey, packageName)
 
-  // Try first URL immediately within user gesture
-  tryLaunchUrl(urls[0])
+  launchIntentUrl(launcherUrl)
 
-  let opened = await watchForAppOpen(2000)
+  const opened = await watchForAppOpen(2500)
+  const status = opened ? 'app_opened' : 'app_launch_failed'
 
-  if (!opened && urls[1]) {
-    console.log('[AppLauncher] First attempt failed, trying scheme:', urls[1])
-    tryLaunchUrl(urls[1])
-    opened = await watchForAppOpen(1500)
+  console.log('[AppLauncher] Result:', appKey, status, '| URL:', launcherUrl)
+
+  return {
+    opened,
+    status,
+    app: appKey,
+    packageName,
+    launcherUrl,
+    launchFailed: !opened,
   }
-
-  if (!opened && urls[2]) {
-    console.log('[AppLauncher] Trying launcher intent')
-    tryLaunchUrl(urls[2])
-    opened = await watchForAppOpen(1500)
-  }
-
-  const status = opened ? 'app_opened' : 'app_not_installed'
-  console.log('[AppLauncher] Result:', appKey, status)
-
-  return { opened, status, app: appKey, notInstalled: !opened }
 }
 
 export async function openPaytmApp() {

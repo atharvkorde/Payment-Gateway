@@ -18,6 +18,7 @@ export function DebugProvider({ children }) {
     androidVersion: device.androidVersion || 'N/A',
     generatedUpiUrl: saved?.generatedUpiUrl || '',
     intentUrl: saved?.intentUrl || '',
+    launcherUrl: saved?.launcherUrl || '',
     lastClickedApp: saved?.lastClickedApp || 'None',
     intentLaunchStatus: saved?.intentLaunchStatus || 'None',
     testMode: saved?.testMode || null,
@@ -43,6 +44,7 @@ export function DebugProvider({ children }) {
         app: result.app || result.lastClickedApp,
         status: result.testMode || result.intentLaunchStatus,
         flowType: result.flowType || FLOW_TYPES[result.app] || prev.flowType,
+        launcherUrl: result.launcherUrl || result.intentUrl,
         timestamp: result.timestamp || new Date().toISOString(),
       }
       const launchHistory = [entry, ...(prev.launchHistory || [])].slice(0, 10)
@@ -51,6 +53,7 @@ export function DebugProvider({ children }) {
         ...prev,
         generatedUpiUrl: result.paymentLink || result.upiUrl || result.generatedUpiUrl || prev.generatedUpiUrl,
         intentUrl: result.intentUrl || prev.intentUrl,
+        launcherUrl: result.launcherUrl || result.intentUrl || prev.launcherUrl,
         lastClickedApp: result.app || result.lastClickedApp || prev.lastClickedApp,
         intentLaunchStatus: result.intentLaunchStatus || result.testMode || prev.intentLaunchStatus,
         testMode: result.testMode || prev.testMode,

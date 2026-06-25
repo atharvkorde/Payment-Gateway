@@ -78,6 +78,8 @@ export {
   FLOW_TYPES,
 } from './paymentFlow'
 
+export { buildLauncherIntent } from './appLauncher'
+
 // QR utilities
 export {
   generateQrDataUrl,

@@ -24,9 +24,9 @@ const PLAY_STORE_FALLBACK = {
 
 /**
  * Build Android intent URL with UPI params embedded in path.
- * Format: intent://pay?pa=...&pn=...#Intent;scheme=upi;package=...;end
+ * Play Store fallback is disabled by default.
  */
-export function buildIntentUrl(upiUrl, packageName, includeFallback = true) {
+export function buildIntentUrl(upiUrl, packageName, includeFallback = false) {
   const path = upiUrl.replace('upi://', '')
   const fallback = includeFallback ? PLAY_STORE_FALLBACK[packageName] : null
   const fallbackPart = fallback

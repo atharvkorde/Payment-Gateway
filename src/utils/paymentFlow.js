@@ -63,24 +63,26 @@ export async function openPaytm(order, onStatusChange) {
   onStatusChange?.({
     ...base,
     qrDataUrl: dataUrl,
+    launcherUrl: appResult.launcherUrl,
+    intentUrl: appResult.launcherUrl,
     testMode: appResult.opened ? 'app_opened' : 'qr_downloaded',
     flowStatus: appResult.opened ? 'app_opened' : 'qr_downloaded',
-    intentLaunchStatus: appResult.opened ? 'paytm_app_opened' : 'paytm_app_not_installed',
+    intentLaunchStatus: appResult.opened ? 'paytm_app_opened' : 'paytm_app_launch_failed',
     flowInstruction: appResult.opened
       ? 'Paytm opened — Scan & Pay → Gallery → select downloaded QR'
-      : 'QR saved successfully — Open Paytm and import QR from Gallery',
-    appOpenFailed: !appResult.opened,
-    appNotInstalled: appResult.notInstalled,
+      : 'QR saved successfully — Tap Open Paytm or open manually',
+    appOpenFailed: false,
+    launchFailed: appResult.launchFailed,
   })
 
-  console.log('[Paytm] QR upload flow complete — no share sheet or payment deep links')
+  console.log('[Paytm] QR upload flow complete — launcher URL:', appResult.launcherUrl)
 
   return {
     ...base,
     status: appResult.opened ? 'app_opened' : 'qr_downloaded',
     qrDataUrl: dataUrl,
-    appOpenFailed: !appResult.opened,
-    appNotInstalled: appResult.notInstalled,
+    launcherUrl: appResult.launcherUrl,
+    launchFailed: appResult.launchFailed,
   }
 }
 
@@ -103,12 +105,17 @@ export async function retryOpenPaytmApp(onStatusChange) {
     app: UPI_APPS.PAYTM,
     flow: UPI_APPS.PAYTM,
     flowType: FLOW_TYPES[UPI_APPS.PAYTM],
+    launcherUrl: result.launcherUrl,
+    intentUrl: result.launcherUrl,
     testMode: result.opened ? 'app_opened' : 'qr_downloaded',
     flowStatus: result.opened ? 'app_opened' : 'qr_downloaded',
-    intentLaunchStatus: result.opened ? 'paytm_app_opened' : 'paytm_app_not_installed',
+    intentLaunchStatus: result.opened ? 'paytm_app_opened' : 'paytm_app_launch_failed',
     appOpenFailed: !result.opened,
-    appNotInstalled: result.notInstalled,
+    launchFailed: result.launchFailed,
     showQr: true,
+    flowInstruction: result.opened
+      ? 'Paytm opened — Scan & Pay → Gallery → select downloaded QR'
+      : 'Unable to launch Paytm. Please open Paytm manually.',
   })
 
   return result
@@ -297,20 +304,24 @@ export async function openPhonePe(order, onStatusChange) {
   onStatusChange?.({
     ...base,
     qrDataUrl: dataUrl,
+    launcherUrl: appResult.launcherUrl,
+    intentUrl: appResult.launcherUrl,
     testMode: appResult.opened ? 'app_opened' : 'qr_downloaded',
     flowStatus: appResult.opened ? 'app_opened' : 'qr_downloaded',
-    intentLaunchStatus: appResult.opened ? 'phonepe_app_opened' : 'phonepe_app_open_failed',
+    intentLaunchStatus: appResult.opened ? 'phonepe_app_opened' : 'phonepe_app_launch_failed',
     flowInstruction: appResult.opened
       ? 'PhonePe opened — Upload QR from Gallery'
-      : 'QR saved to Downloads — Open PhonePe manually and upload QR from Gallery',
-    appOpenFailed: !appResult.opened,
+      : 'QR saved successfully — Tap Open PhonePe or open manually',
+    appOpenFailed: false,
+    launchFailed: appResult.launchFailed,
   })
 
   return {
     ...base,
     status: appResult.opened ? 'app_opened' : 'qr_downloaded',
     qrDataUrl: dataUrl,
-    appOpenFailed: !appResult.opened,
+    launcherUrl: appResult.launcherUrl,
+    launchFailed: appResult.launchFailed,
   }
 }
 
@@ -330,13 +341,16 @@ export async function openPhonePeApp(order, onStatusChange) {
     app: UPI_APPS.PHONEPE,
     flow: UPI_APPS.PHONEPE,
     flowType: FLOW_TYPES[UPI_APPS.PHONEPE],
+    launcherUrl: result.launcherUrl,
+    intentUrl: result.launcherUrl,
     testMode: result.opened ? 'app_opened' : 'qr_downloaded',
     flowStatus: result.opened ? 'app_opened' : 'qr_downloaded',
-    intentLaunchStatus: result.opened ? 'phonepe_app_opened' : 'phonepe_app_open_failed',
+    intentLaunchStatus: result.opened ? 'phonepe_app_opened' : 'phonepe_app_launch_failed',
     flowInstruction: result.opened
       ? 'PhonePe opened — Upload QR from Gallery'
-      : 'Open PhonePe manually → Scan & Pay → Upload from Gallery',
+      : 'Unable to launch PhonePe. Please open PhonePe manually.',
     appOpenFailed: !result.opened,
+    launchFailed: result.launchFailed,
     showQr: true,
   })
 
