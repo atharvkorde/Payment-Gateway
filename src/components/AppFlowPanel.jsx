@@ -1,10 +1,9 @@
 import { UPI_APPS } from '../constants'
-import { FLOW_CONFIG } from '../constants/payment'
+import { FLOW_CONFIG, PAYTM_QR_STEPS } from '../constants/payment'
 import { UpiAppIcon } from './UpiAppIcon'
 import FlowStatusBadges from './FlowStatusBadges'
 import {
   retryGooglePayShare,
-  retryPaytmShare,
   openPhonePeApp,
   retryOpenPaytmApp,
   openAppViaIntent,
@@ -17,7 +16,7 @@ export default function AppFlowPanel({
   instruction,
   flowStatus,
   appOpenFailed,
-  shareFailed,
+  appNotInstalled,
   onStatusChange,
   onLoading,
 }) {
@@ -30,15 +29,6 @@ export default function AppFlowPanel({
     onLoading?.(flow)
     try {
       await retryGooglePayShare(order, onStatusChange)
-    } finally {
-      onLoading?.(null)
-    }
-  }
-
-  const handleRetryPaytmShare = async () => {
-    onLoading?.(flow)
-    try {
-      await retryPaytmShare(order, onStatusChange)
     } finally {
       onLoading?.(null)
     }
@@ -97,36 +87,33 @@ export default function AppFlowPanel({
           </div>
         )}
 
-        {/* Paytm — Share flow (mirrors Google Pay) */}
+        {/* Paytm — QR upload flow (mirrors PhonePe) */}
         {flow === UPI_APPS.PAYTM && (
           <div className="mt-4 space-y-3">
             <div className="rounded-xl bg-white/80 px-4 py-3">
-              <p className="text-sm font-semibold text-paytm">Share with Paytm</p>
-              <p className="mt-1 text-xs leading-relaxed text-gray-600">
-                Share QR image + payment link via Android share sheet. Select Paytm from targets.
-              </p>
-              {shareFailed && (
-                <p className="mt-2 text-xs font-medium text-amber-700">
-                  Share failed — QR downloaded as fallback. Scan above or open Paytm.
-                </p>
-              )}
+              <p className="text-sm font-semibold text-paytm">✓ QR saved successfully</p>
+              <ol className="mt-2 space-y-1.5 text-xs leading-relaxed text-gray-600">
+                {PAYTM_QR_STEPS.map((step, i) => (
+                  <li key={step}>
+                    {i + 1}. {step}
+                  </li>
+                ))}
+              </ol>
             </div>
 
             <button
               type="button"
-              onClick={handleRetryPaytmShare}
-              className={`w-full rounded-xl ${cfg.accent} py-3.5 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] hover:opacity-90`}
-            >
-              Share QR → Select Paytm
-            </button>
-
-            <button
-              type="button"
               onClick={handleOpenPaytm}
-              className="w-full rounded-xl border-2 border-paytm bg-white py-3 text-sm font-bold text-paytm transition-all active:scale-[0.98] hover:bg-sky-50"
+              className={`w-full rounded-xl ${cfg.accent} py-3.5 text-sm font-bold text-white shadow-lg transition-all active:scale-[0.98] hover:opacity-90`}
             >
               Open Paytm
             </button>
+
+            {(appNotInstalled || appOpenFailed) && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600">
+                Please install Paytm.
+              </p>
+            )}
           </div>
         )}
 
@@ -134,7 +121,7 @@ export default function AppFlowPanel({
         {flow === UPI_APPS.PHONEPE && (
           <div className="mt-4 space-y-3">
             <div className="rounded-xl bg-white/80 px-4 py-3">
-              <p className="text-sm font-semibold text-phonepe">📥 QR saved to Downloads</p>
+              <p className="text-sm font-semibold text-phonepe">✓ QR saved successfully</p>
               <ol className="mt-2 space-y-1.5 text-xs leading-relaxed text-gray-600">
                 <li>1. Open PhonePe app</li>
                 <li>2. Go to Scan & Pay → Upload from Gallery</li>

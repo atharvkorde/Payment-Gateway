@@ -6,12 +6,9 @@ export const TEST_MODE_LABELS = {
   fallback_used: { label: 'Fallback Used', color: 'bg-amber-500', icon: '↻' },
   attempting: { label: 'Launching...', color: 'bg-blue-500', icon: '⟳' },
   qr_generated: { label: 'QR Generated', color: 'bg-indigo-500', icon: '▣' },
-  qr_downloaded: { label: 'QR Downloaded', color: 'bg-phonepe', icon: '⬇' },
+  qr_downloaded: { label: 'QR Saved Successfully', color: 'bg-sky-500', icon: '⬇' },
   qr_shown: { label: 'QR Displayed', color: 'bg-purple-500', icon: '▣' },
   qr_shared: { label: 'Share Sheet Opened', color: 'bg-green-600', icon: '↗' },
-  paytm_share_started: { label: 'Paytm Share Started', color: 'bg-blue-500', icon: '⟳' },
-  paytm_share_success: { label: 'Share Sheet Opened', color: 'bg-green-600', icon: '↗' },
-  paytm_share_failed: { label: 'Paytm Share Failed', color: 'bg-red-500', icon: '✗' },
   app_opened: { label: 'App Opened', color: 'bg-green-500', icon: '✓' },
   error: { label: 'Error', color: 'bg-red-600', icon: '!' },
 }
@@ -19,7 +16,7 @@ export const TEST_MODE_LABELS = {
 export const METHOD_BADGES = {
   google_pay: { label: 'Share + QR', color: 'bg-blue-100 text-blue-700' },
   phonepe: { label: 'QR Upload', color: 'bg-purple-100 text-purple-700' },
-  paytm: { label: 'Share + QR', color: 'bg-sky-100 text-sky-700' },
+  paytm: { label: 'QR Upload', color: 'bg-sky-100 text-sky-700' },
   bhim: { label: 'UPI Intent', color: 'bg-teal-100 text-teal-700' },
 }
 
@@ -40,7 +37,7 @@ export const FLOW_CONFIG = {
     title: 'Paytm',
     color: 'border-paytm/30 bg-sky-50',
     accent: 'bg-paytm',
-    flowType: 'Share',
+    flowType: 'QR Upload',
   },
   bhim: {
     title: 'BHIM',
@@ -52,9 +49,10 @@ export const FLOW_CONFIG = {
 
 export const FLOW_STATUS_STEPS = ['qr_generated', 'qr_downloaded', 'app_opened']
 
-export const PAYTM_DEBUG_LABELS = {
-  paytm_share_started: 'Paytm Share Started',
-  paytm_share_success: 'Paytm Share Success',
-  paytm_share_failed: 'Paytm Share Failed',
-  fallback_used: 'Fallback Used',
-}
+export const PAYTM_QR_STEPS = [
+  'Open Paytm',
+  'Tap Scan & Pay',
+  'Choose Gallery / Import QR',
+  'Select the downloaded QR image',
+  'Complete the payment',
+]

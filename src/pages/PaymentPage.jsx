@@ -63,7 +63,7 @@ export default function PaymentPage() {
         instruction: result.flowInstruction || activeFlow?.instruction,
         flowStatus: result.flowStatus || flowStatus,
         appOpenFailed: result.appOpenFailed ?? activeFlow?.appOpenFailed,
-        shareFailed: result.shareFailed ?? activeFlow?.shareFailed,
+        appNotInstalled: result.appNotInstalled ?? activeFlow?.appNotInstalled,
       })
     } else if (result.qrDataUrl && result.app) {
       setActiveFlow((prev) => ({
@@ -170,7 +170,7 @@ export default function PaymentPage() {
             instruction={activeFlow.instruction}
             flowStatus={activeFlow.flowStatus || flowStatus}
             appOpenFailed={activeFlow.appOpenFailed}
-            shareFailed={activeFlow.shareFailed}
+            appNotInstalled={activeFlow.appNotInstalled}
             onStatusChange={handleStatusChange}
             onLoading={setLoading}
           />
@@ -197,7 +197,7 @@ export default function PaymentPage() {
       </button>
 
       <p className="mt-3 text-center text-[11px] leading-relaxed text-gray-400">
-        Paytm: Share + QR · GPay: Share + QR · PhonePe: QR Upload
+        Paytm: QR Upload · GPay: Share + QR · PhonePe: QR Upload
       </p>
 
       <DebugPanel />

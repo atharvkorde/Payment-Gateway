@@ -73,7 +73,6 @@ export {
   openBhim,
   openGenericUpi,
   retryGooglePayShare,
-  retryPaytmShare,
   retryOpenPaytmApp,
   openAppViaIntent,
   FLOW_TYPES,

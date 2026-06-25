@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useDebug } from '../hooks/useDebug'
-import { PAYTM_DEBUG_LABELS } from '../constants/payment'
 
 export default function DebugPanel({ defaultExpanded = false }) {
   const { debug } = useDebug()
@@ -35,9 +34,6 @@ export default function DebugPanel({ defaultExpanded = false }) {
             <Row label="Last App" value={debug.lastClickedApp} />
             <Row label="Status" value={debug.intentLaunchStatus} />
             <Row label="Test Mode" value={debug.testMode || '—'} />
-            {PAYTM_DEBUG_LABELS[debug.testMode] && (
-              <Row label="Paytm Debug" value={PAYTM_DEBUG_LABELS[debug.testMode]} valueClass="text-sky-400" />
-            )}
             {debug.lastLaunchTime && (
               <Row label="Time" value={new Date(debug.lastLaunchTime).toLocaleTimeString()} />
             )}
@@ -60,18 +56,10 @@ export default function DebugPanel({ defaultExpanded = false }) {
             ))}
           </Section>
 
-          {debug.flowType === 'Share' && debug.lastClickedApp === 'paytm' && (
-            <Section title="Paytm Share">
-              <p className="text-[10px] text-gray-500">
-                Share flow — QR image + payment link via Android share sheet. No UPI Intent.
-              </p>
-            </Section>
-          )}
-
           {debug.flowType === 'QR Upload' && (
-            <Section title="QR Flow">
+            <Section title="QR Upload Flow">
               <p className="text-[10px] text-gray-500">
-                QR upload flow — no UPI Intent or deep link navigation used.
+                QR download + app launcher only. No share sheet, no payment deep links.
               </p>
             </Section>
           )}

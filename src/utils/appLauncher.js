@@ -3,14 +3,12 @@ import { detectDevice, getBrowserLaunchStrategy } from './device'
 
 const APP_LAUNCH_URLS = {
   [UPI_APPS.PAYTM]: [
-    `intent://paytmmp#Intent;scheme=paytmmp;package=${UPI_PACKAGES[UPI_APPS.PAYTM]};end`,
-    'paytmmp://',
     `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${UPI_PACKAGES[UPI_APPS.PAYTM]};end`,
   ],
   [UPI_APPS.PHONEPE]: [
+    `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${UPI_PACKAGES[UPI_APPS.PHONEPE]};end`,
     `intent://phonepe#Intent;scheme=phonepe;package=${UPI_PACKAGES[UPI_APPS.PHONEPE]};end`,
     'phonepe://',
-    `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${UPI_PACKAGES[UPI_APPS.PHONEPE]};end`,
   ],
 }
 
@@ -104,10 +102,10 @@ export async function openAppOnly(appKey) {
     opened = await watchForAppOpen(1500)
   }
 
-  const status = opened ? 'app_opened' : 'app_open_failed'
+  const status = opened ? 'app_opened' : 'app_not_installed'
   console.log('[AppLauncher] Result:', appKey, status)
 
-  return { opened, status, app: appKey }
+  return { opened, status, app: appKey, notInstalled: !opened }
 }
 
 export async function openPaytmApp() {
